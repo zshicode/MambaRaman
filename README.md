@@ -1,6 +1,6 @@
-# Deep learning for element identification using Raman spectrum
+# MambaRaman: Selective state space model for element identification using Raman spectroscopy
 
-This repository proposes attention-based residual networks for element identification of minerals using Raman spectrum. Deep learning (DL) for Raman spectrum has been adopted for mineral classification (Liu et al., 2017; Zhang et al., 2020). On this basis, this repository aims to identify specific elements in minerals or other inorganic materials by DL-based Raman spectroscopy. 
+This repository proposes Selective state space model (i.e. Mamba) for element identification of minerals using Raman spectrum. Deep learning (DL) for Raman spectrum has been adopted for mineral classification (Liu et al., 2017; Zhang et al., 2020). On this basis, this repository aims to identify specific elements in minerals or other inorganic materials by Mamba-based Raman spectroscopy. Some code of the Mamba model is from [mamba.py](https://github.com/alxndrTL/mamba.py) and [MambaStock](https://github.com/zshicode/Mambastock).
 
 ## Requirements
 
@@ -55,8 +55,10 @@ parser.add_argument('--lr', type=float, default=0.01,
                     help='Learning rate.')
 parser.add_argument('--wd', type=float, default=1e-5,
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=64,
+parser.add_argument('--hidden', type=int, default=16,
                     help='Dimension of representations')
+parser.add_argument('--layer', type=int, default=2,
+                    help='Num of layers')
 parser.add_argument('--c', type=int, default=2,
                     help='Num of classes')
 parser.add_argument('--d', type=int, default=1024,
@@ -70,6 +72,18 @@ parser.add_argument('--raw', type=str, default='Processed',
 
 args = parser.parse_args()
 args.cuda = args.use_cuda and torch.cuda.is_available()
+```
+
+## Citation
+
+MambaStock adopted Mamba for stock prediction while achieving superior performance, and this repo is also inspired by MambaStock. Therefore, if you refer or use this repo to adopt Mamba for spectral data (or other kinds of data), citing MambaStock paper is also welcomed.
+```
+@article{shi2024mamba,
+  title={MambaStock: Selective state space model for stock prediction},
+  author={Zhuangwei Shi},
+  journal={arXiv preprint arXiv:2402.18959},
+  year={2024},
+}
 ```
 
 ## References
