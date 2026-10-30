@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import argparse
 from collections import Counter
+from mamba import Mamba, MambaConfig
 
 elem = ['Mg','Al','P','S','Fe','Cu']
 
@@ -25,8 +26,10 @@ parser.add_argument('--lr', type=float, default=0.01,
                     help='Learning rate.')
 parser.add_argument('--wd', type=float, default=1e-5,
                     help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=64,
+parser.add_argument('--hidden', type=int, default=16,
                     help='Dimension of representations')
+parser.add_argument('--layer', type=int, default=2,
+                    help='Num of layers')
 parser.add_argument('--c', type=int, default=2,
                     help='Num of classes')
 parser.add_argument('--d', type=int, default=1024,
@@ -151,27 +154,26 @@ def evaluate(yv,pred,predict,name):
     plt.show()
     print('%s,#PositiveSample=%d,auc=%.3f' % (name,yv.sum(),auc))
 
-class Attention(nn.Module):
-    def __init__(self):
-        super(Attention,self).__init__()
-        self.lin1 = nn.Linear(args.d,args.hidden)
-        self.q = nn.Linear(args.hidden,args.hidden)
-        self.k = nn.Linear(args.hidden,args.hidden)
-        self.v = nn.Linear(args.hidden,args.hidden)
-        self.lin2 = nn.Linear(args.hidden,1)
-
+class Net(nn.Module):
+    def __init__(self,in_dim,out_dim):
+        super().__init__()
+        self.config = MambaConfig(d_model=args.hidden, n_layers=args.layer)
+        self.mamba = nn.Sequential(
+            nn.Linear(in_dim,args.hidden),
+            Mamba(self.config),
+            nn.Linear(args.hidden,out_dim),
+            nn.Sigmoid()
+        )
+    
     def forward(self,x):
-        x = self.lin1(x)
-        w = torch.mm(self.q(x),self.k(x).t())/np.sqrt(args.hidden)
-        x = x + torch.mm(torch.softmax(w,dim=-1),self.v(x))
-        x = self.lin2(x)
-        return x.squeeze()
+        x = self.mamba(x)
+        return x.flatten()
 
 def nnclassifier(xt,yt,xv,yv):
-    xt = torch.from_numpy(xt).float()
-    xv = torch.from_numpy(xv).float()
+    clf = Net(len(xt[0]),1)
+    xt = torch.from_numpy(xt).float().unsqueeze(0)
+    xv = torch.from_numpy(xv).float().unsqueeze(0)
     yt = torch.Tensor(yt)
-    clf = Attention()
     opt = torch.optim.Adam(clf.parameters(),lr=args.lr,weight_decay=args.wd)
     if args.cuda:
         clf = clf.cuda()
