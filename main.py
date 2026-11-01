@@ -34,8 +34,8 @@ parser.add_argument('--c', type=int, default=2,
                     help='Num of classes')
 parser.add_argument('--d', type=int, default=1024,
                     help='Num of spectra dimension')
-parser.add_argument('--model', type=str, default='NN',
-                    help='Model')
+parser.add_argument('--model', type=str, default='FlowMatching',
+                    help='Diffusion Model')
 parser.add_argument('--wavelength', type=str, default='780',
                     help='Excitation wavelength of data')
 parser.add_argument('--raw', type=str, default='Processed',
@@ -154,20 +154,64 @@ def evaluate(yv,pred,predict,name):
     plt.show()
     print('%s,#PositiveSample=%d,auc=%.3f' % (name,yv.sum(),auc))
 
-class Net(nn.Module):
+class DDIM(nn.Module):
     def __init__(self,in_dim,out_dim):
         super().__init__()
         self.config = MambaConfig(d_model=args.hidden, n_layers=args.layer)
-        self.mamba = nn.Sequential(
-            nn.Linear(in_dim,args.hidden),
-            Mamba(self.config),
+        self.epsilon = Mamba(self.config)
+        beta0 = 1e-4
+        ite = 1000
+        alpha_bar = 1
+        for i in range(ite):
+            beta = 0.02*i/ite + beta0
+            alpha = 1-beta
+            alpha_bar *= alpha
+        
+        self.alpha_bar = alpha_bar
+    
+    def forward(self,x):
+        eps = torch.randn_like(x)
+        xt = np.sqrt(self.alpha_bar)*x+np.sqrt(1-self.alpha_bar)*eps
+        epst = self.epsilon(xt)
+        x0 = (xt-np.sqrt(1-self.alpha_bar)*epst)/np.sqrt(self.alpha_bar)
+        return eps,epst,x0
+
+class FlowMatching(nn.Module):
+    def __init__(self,in_dim,out_dim):
+        super().__init__()
+        self.config = MambaConfig(d_model=args.hidden, n_layers=args.layer)
+        self.epsilon = Mamba(self.config)
+        self.t = nn.Parameter(torch.rand(1))
+    
+    def forward(self,x):
+        eps = torch.randn_like(x)
+        v = x-eps
+        xt = (1-self.t)*x+self.t*eps
+        vt = self.epsilon(xt)
+        x0 = xt+self.t*vt
+        return v,vt,x0
+
+class Net(nn.Module):
+    def __init__(self,in_dim,out_dim):
+        super().__init__()
+        self.enc = nn.Linear(in_dim,args.hidden)
+        if args.model == 'DDIM':
+            self.diff = DDIM(args.hidden,args.hidden)
+        else:
+            self.diff = FlowMatching(args.hidden,args.hidden)
+        
+        self.dec = nn.Linear(args.hidden,in_dim)
+        self.classifier = nn.Sequential(
             nn.Linear(args.hidden,out_dim),
             nn.Sigmoid()
         )
     
     def forward(self,x):
-        x = self.mamba(x)
-        return x.flatten()
+        z = self.enc(x)
+        eps,epst,z0 = self.diff(z)
+        x0 = self.dec(z0)
+        h = self.classifier(z0)
+        return h.flatten(),eps,epst,x0
 
 def nnclassifier(xt,yt,xv,yv):
     clf = Net(len(xt[0]),1)
@@ -175,6 +219,8 @@ def nnclassifier(xt,yt,xv,yv):
     xv = torch.from_numpy(xv).float().unsqueeze(0)
     yt = torch.Tensor(yt)
     opt = torch.optim.Adam(clf.parameters(),lr=args.lr,weight_decay=args.wd)
+    lambda1 = 1
+    lambda2 = 0.1
     if args.cuda:
         clf = clf.cuda()
         xt = xt.cuda()
@@ -183,8 +229,8 @@ def nnclassifier(xt,yt,xv,yv):
     
     for e in range(args.epochs):
         clf.train()
-        z = clf(xt)
-        loss = F.mse_loss(z,yt)
+        h,eps,epst,x0 = clf(xt)
+        loss = F.mse_loss(h,yt)+lambda1*F.mse_loss(xt,x0)+lambda2*F.mse_loss(epst,eps)
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -192,9 +238,9 @@ def nnclassifier(xt,yt,xv,yv):
         #     print('Epoch %d | Lossp: %.4f' % (e, loss.item()))
 
     clf.eval()
-    z = clf(xv)
-    if args.cuda: z = z.cpu()
-    predict = z.detach().numpy()
+    h,_,_,_ = clf(xv)
+    if args.cuda: h = h.cpu()
+    predict = h.detach().numpy()
     predict -= min(predict)
     predict /= max(predict)
     fpr,tpr,th = roc_curve(yv,predict)
