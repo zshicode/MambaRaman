@@ -1,6 +1,8 @@
 # MambaRaman: Selective state space model for element identification using Raman spectroscopy
 
-This repository proposes Selective state space model (i.e. Mamba) for element identification of minerals using Raman spectrum. Deep learning (DL) for Raman spectrum has been adopted for mineral classification (Liu et al., 2017; Zhang et al., 2020). On this basis, this repository aims to identify specific elements in minerals or other inorganic materials by Mamba-based Raman spectroscopy. Some code of the Mamba model is from [mamba.py](https://github.com/alxndrTL/mamba.py) and [MambaStock](https://github.com/zshicode/Mambastock).
+This repository proposes Selective state space model (i.e. Mamba) for element identification of minerals using Raman spectrum. Deep learning (DL) for Raman spectrum has been adopted for mineral classification (Liu et al., 2017; Zhang et al., 2020). On this basis, this repository aims to identify specific elements in minerals or other inorganic materials by Mamba-based Raman spectroscopy. Some code of the $Mamba$ model is from [mamba.py](https://github.com/alxndrTL/mamba.py) and [MambaStock](https://github.com/zshicode/Mambastock).
+
+$$e=m$$
 
 ## Requirements
 
