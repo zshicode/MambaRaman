@@ -215,8 +215,8 @@ class Net(nn.Module):
 
 def nnclassifier(xt,yt,xv,yv):
     clf = Net(len(xt[0]),1)
-    xt = torch.from_numpy(xt).float().unsqueeze(0)
-    xv = torch.from_numpy(xv).float().unsqueeze(0)
+    xt = torch.from_numpy(xt).float().unsqueeze(1)
+    xv = torch.from_numpy(xv).float().unsqueeze(1)
     yt = torch.Tensor(yt)
     opt = torch.optim.Adam(clf.parameters(),lr=args.lr,weight_decay=args.wd)
     lambda1 = 1
